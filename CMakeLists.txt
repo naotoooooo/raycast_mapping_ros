@@ -34,3 +34,24 @@ if(CATKIN_ENABLE_TESTING)
   roslint_cpp()
   roslint_add_test()
 endif()
+
+install(TARGETS raycast_mapping_node DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+
+
+install(DIRECTORY launch/
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+)
+
+
+# OpenCVのビルド環境の設定ファイルを読み込む
+find_package(OpenCV REQUIRED)
+
+# OpenCV関係のインクルードディレクトリのパスを設定
+include_directories(
+    ${OpenCV_INCLUDE_DIRS}
+)
+
+# リンクするライブラリを読み込む
+target_link_libraries(raycast_mapping_node
+    ${OpenCV_LIBRARIES}
+)
