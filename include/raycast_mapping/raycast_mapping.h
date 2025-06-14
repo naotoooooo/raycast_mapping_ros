@@ -65,28 +65,9 @@ private:
    *
    * @param map_reso Map resolution
    * @param map_size Map size
-   * @param yaw_reso Yaw resolution
    * @return PrecastDB Precast database
    */
-  PrecastDB create_precast_db(const float map_reso, const float map_size, const float yaw_reso);
-
-  /**
-   * @brief Calculate distance and angle
-   *
-   * @param index Index
-   * @param map_info Map information
-   * @return std::pair<float, float> Distance and angle
-   */
-  std::pair<float, float> calc_dist_and_angle(const int index, const nav_msgs::MapMetaData &map_info);
-
-  /**
-   * @brief Calculate angle ID
-   *
-   * @param angle Angle
-   * @param yaw_reso Yaw resolution
-   * @return int Angle ID
-   */
-  int calc_angle_id(float angle, const float yaw_reso);
+  PrecastDB create_precast_db(const float map_reso, const float map_size);
 
   /**
    * @brief Initialize map
