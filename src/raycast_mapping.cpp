@@ -17,7 +17,7 @@ LocalMapCreator::LocalMapCreator(void) : private_nh_("~"), tf_listener_(tf_buffe
 {
   private_nh_.param<std::string>("frame_id", frame_id_, "base_footprint");
   private_nh_.param<float>("map_reso", map_reso_, 0.05);
-  private_nh_.param<float>("map_size", map_size_, 10.0);
+  private_nh_.param<float>("map_size", map_size_, 30.0);
 
   map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("/local_map", 1);
   // cloud_sub_ = nh_.subscribe("/cloud", 1, &LocalMapCreator::cloud_callback, this);
@@ -72,12 +72,17 @@ LocalMapCreator::LocalMapCreator(void) : private_nh_("~"), tf_listener_(tf_buffe
 
 void LocalMapCreator::timer_callback(const ros::TimerEvent &)
 {
-  cv::Vec3b free_color(127, 63, 127);  // Road
-  
-  std::string image_path = "/home/user/ws/src/birds_eye_output_seg102.png";  // 必要に応じてパスを変更
+  cv::Vec3b trimming_color(0,0,0);  // trimming range
+  // cv::Vec3b free_color(127, 63, 127);  // Road
+  cv::Vec3b free_color(254, 127, 0);  // floor
+
+  // std::string image_path = "/home/user/ws/src/bev_meiji_outdoor/bev_1750893090.087051_seg_only.png";  // 必要に応じてパスを変更
+  // std::string image_path = "/home/user/ws/src/bev_meiji_outdoor/bev_1750893196.839462_seg_only.png";  // 必要に応じてパスを変更
+  // std::string image_path = "/home/user/ws/src/bev_meiji_indoor_8class/bev_1750316090.940470.png";
+  std::string image_path = "/home/user/ws/src/bev_meiji_indoor_8class/bev_1750316451.496942.png";
   // This function is intentionally left empty.
   // It can be used for periodic tasks if needed.
-  nav_msgs::OccupancyGrid local_map = make_images(free_color,image_path, precast_db_);
+  nav_msgs::OccupancyGrid local_map = make_images(free_color,trimming_color,image_path, precast_db_);
   local_map.header.frame_id = frame_id_;
   local_map.header.stamp = ros::Time::now();
   map_pub_.publish(local_map);
@@ -119,7 +124,7 @@ int LocalMapCreator::xy_to_grid_index(const float x, const float y, const nav_ms
 
 
 
-nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color,std::string image_path, const PrecastDB &precast_db)  // 必要に応じてパスを変更
+nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color, cv::Vec3b trimming_color, std::string image_path, const PrecastDB &precast_db)  // 必要に応じてパスを変更
 {
   // // 固定された画像ファイルパス
   // std::string image_path = "/home/user/ws/src/birds_eye_output_seg102.png";  // 必要に応じてパスを変更
@@ -133,16 +138,27 @@ nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color,std::s
 
    // 色の変更処理（例：赤っぽいピクセル → 青に変更）
   for (int y = 0; y < image.rows; ++y) {
-      for (int x = 0; x < image.cols; ++x) {
-          cv::Vec3b& pixel = image.at<cv::Vec3b>(y, x);
-          std::cout << "Pixel at (" << x << ", " << y << "): "
-                    << "B: " << static_cast<int>(pixel[0]) << ", "
-                    << "G: " << static_cast<int>(pixel[1]) << ", "
-                    << "R: " << static_cast<int>(pixel[2]) << std::endl;
-          if (pixel != free_color) {  // free_colorと一致するピクセルを検出
-              local_map.data[x+y*200] = 100;  // occupied
-          }
+    for (int x = 0; x < image.cols; ++x) {
+      std::cout << "Debug: Entering pixel output code" << std::endl;
+      cv::Vec3b& pixel = image.at<cv::Vec3b>(y, x);
+      std::cout << "Pixel at (" << x << ", " << y << "): "
+                << "B: " << static_cast<int>(pixel[0]) << ", "
+                << "G: " << static_cast<int>(pixel[1]) << ", "
+                << "R: " << static_cast<int>(pixel[2]) << std::endl
+                << std::flush;
+      if (pixel == trimming_color) {  // trimming_colorと一致するピクセルを検出
+        pixel = free_color;  // free_colorに変更
+        std::cout << "Pixel at (" << x << ", " << y << ") changed to free_color." << std::endl;
       }
+      if (pixel != free_color) {  // free_colorと一致するピクセルを検出
+        int x_img = image.cols - 1 - x;  // ← 左右反転
+        int y_img = y;
+        int x_rot = y_img;
+        int y_rot = precast_db.info.width - 1 - x_img;
+        int index = x_rot + y_rot * precast_db.info.width;
+        local_map.data[index] = 100;  // occupied
+        }
+    }
   }
 
   // 画像の表示

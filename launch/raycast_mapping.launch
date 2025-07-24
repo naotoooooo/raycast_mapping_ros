@@ -6,14 +6,14 @@
     <arg name="output" default="log" doc="screen or log"/>
     <arg name="frame_id" default="map"/>
     <arg name="map_reso" default="0.05"/>
-    <arg name="map_size" default="10.0"/>
+    <arg name="map_size" default="30.0"/>
     <node pkg="raycast_mapping_ros" type="raycast_mapping_node" name="raycast_mapping" output="$(arg output)">
         <param name="frame_id" value="$(arg frame_id)"/>
         <param name="map_reso" value="$(arg map_reso)"/>
         <param name="map_size" value="$(arg map_size)"/>
     </node>
 
-    <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_baselink" args="0 0 0 0 0 0 1 map base_link"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="map_to_baselink" args="0 0 0 0 0 1 0 map base_link"/>
 
     
 </launch>

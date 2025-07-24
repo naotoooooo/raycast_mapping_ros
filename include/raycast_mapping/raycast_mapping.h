@@ -94,7 +94,7 @@ private:
    * @param free_color cost-free color
    * @param image_path Path to images
    */
-  nav_msgs::OccupancyGrid make_images(cv::Vec3b free_color,std::string image_path, const PrecastDB &precast_db);  // 必要に応じてパスを変更
+  nav_msgs::OccupancyGrid make_images(cv::Vec3b free_color, cv::Vec3b trimming_color, std::string image_path, const PrecastDB &precast_db);  // 必要に応じてパスを変更
 
   std::string frame_id_;
   float map_reso_;  // [m/cell]
