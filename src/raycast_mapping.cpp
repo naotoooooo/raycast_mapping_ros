@@ -6,28 +6,26 @@
  */
 
 #include <string>
-#include <utility>
 #include <vector>
 #include <opencv2/opencv.hpp>
+#include "raycast_mapping.hpp"
 
 
-#include "raycast_mapping/raycast_mapping.h"
-
-LocalMapCreator::LocalMapCreator(void) : private_nh_("~"), tf_listener_(tf_buffer_)
+// const rclcpp::NodeOptions & options を使う方法も今後検討する
+LocalMapCreator::LocalMapCreator()
+:Node("raycast_mapping")
 {
-  private_nh_.param<std::string>("frame_id", frame_id_, "base_footprint");
-  private_nh_.param<float>("map_reso", map_reso_, 0.05);
-  private_nh_.param<float>("map_size", map_size_, 30.0);
 
-  map_pub_ = nh_.advertise<nav_msgs::OccupancyGrid>("/local_map", 1);
-  // cloud_sub_ = nh_.subscribe("/cloud", 1, &LocalMapCreator::cloud_callback, this);
-  // タイマーの設定（1秒ごとにコールバックを呼び出す）
-  timer_ = nh_.createTimer(ros::Duration(1.0), &LocalMapCreator::timer_callback, this);
+  this->declare_parameter("frame_id", "base_footprint");
+  this->declare_parameter("map_reso", 0.05);
+  this->declare_parameter("map_size", 30.0);
 
-  ROS_INFO_STREAM(ros::this_node::getName() << " node has started..");
-  ROS_INFO_STREAM("frame_id: " << frame_id_);
-  ROS_INFO_STREAM("map_reso: " << map_reso_);
-  ROS_INFO_STREAM("map_size: " << map_size_);
+  this->get_parameter("frame_id", frame_id_);
+  this->get_parameter("map_reso", map_reso_);
+  this->get_parameter("map_size", map_size_);
+
+  map_pub_ = this->create_publisher<nav_msgs::msg::OccupancyGrid>("/local_map",rclcpp::QoS(1).reliable());
+  timer_ = this->create_wall_timer(0.5s, std::bind(&LocalMapCreator::timer_callback, this));
 
   precast_db_ = create_precast_db(map_reso_, map_size_);
 
@@ -57,20 +55,11 @@ LocalMapCreator::LocalMapCreator(void) : private_nh_("~"), tf_listener_(tf_buffe
   //     [119, 11, 32],   // Bicycle
   // ],dtype=float)
 
-
-
-
-  // cv::Vec3b free_color(127, 63, 127);  // Road
-  
-  // std::string image_path = "/home/user/ws/src/birds_eye_output_seg102.png";  // 必要に応じてパスを変更
-  // make_images(free_color,image_path);
-
-
 }
 
 
 
-void LocalMapCreator::timer_callback(const ros::TimerEvent &)
+void LocalMapCreator::timer_callback()
 {
   cv::Vec3b trimming_color(0,0,0);  // trimming range
   // cv::Vec3b free_color(127, 63, 127);  // Road
@@ -82,10 +71,10 @@ void LocalMapCreator::timer_callback(const ros::TimerEvent &)
   std::string image_path = "/home/user/ws/src/bev_meiji_indoor_8class/bev_1750316451.496942.png";
   // This function is intentionally left empty.
   // It can be used for periodic tasks if needed.
-  nav_msgs::OccupancyGrid local_map = make_images(free_color,trimming_color,image_path, precast_db_);
+  nav_msgs::msg::OccupancyGrid local_map = make_images(free_color,trimming_color,image_path, precast_db_);
   local_map.header.frame_id = frame_id_;
-  local_map.header.stamp = ros::Time::now();
-  map_pub_.publish(local_map);
+  local_map.header.stamp = this->get_clock()->now();
+  map_pub_->publish(local_map);
 }
 
 
@@ -99,13 +88,13 @@ PrecastDB LocalMapCreator::create_precast_db(const float map_reso, const float m
   precast_db.info.origin.position.x = -map_size / 2.0;
   precast_db.info.origin.position.y = -map_size / 2.0;
 
-  ROS_WARN_STREAM("Precast DB has been created");
+  // ROS_WARN_STREAM("Precast DB has been created");
   return precast_db;
 }
 
-nav_msgs::OccupancyGrid LocalMapCreator::init_map(const nav_msgs::MapMetaData &map_info)
+nav_msgs::msg::OccupancyGrid LocalMapCreator::init_map(const nav_msgs::msg::MapMetaData &map_info)
 {
-  nav_msgs::OccupancyGrid local_map;
+  nav_msgs::msg::OccupancyGrid local_map;
   local_map.info = map_info;
   local_map.data.reserve(map_info.width * map_info.height);
   for (int i = 0; i < map_info.width * map_info.height; i++)
@@ -115,7 +104,7 @@ nav_msgs::OccupancyGrid LocalMapCreator::init_map(const nav_msgs::MapMetaData &m
 }
 
 //参考になるかも
-int LocalMapCreator::xy_to_grid_index(const float x, const float y, const nav_msgs::MapMetaData &map_info)
+int LocalMapCreator::xy_to_grid_index(const float x, const float y, const nav_msgs::msg::MapMetaData &map_info)
 {
   const int index_x = static_cast<int>(floor((x - map_info.origin.position.x) / map_info.resolution));
   const int index_y = static_cast<int>(floor((y - map_info.origin.position.y) / map_info.resolution));
@@ -124,12 +113,10 @@ int LocalMapCreator::xy_to_grid_index(const float x, const float y, const nav_ms
 
 
 
-nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color, cv::Vec3b trimming_color, std::string image_path, const PrecastDB &precast_db)  // 必要に応じてパスを変更
+nav_msgs::msg::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color, cv::Vec3b trimming_color, std::string image_path, const PrecastDB &precast_db)  // 必要に応じてパスを変更
 {
-  // // 固定された画像ファイルパス
-  // std::string image_path = "/home/user/ws/src/birds_eye_output_seg102.png";  // 必要に応じてパスを変更
-  std::cout << "hello" << std::endl;
-  nav_msgs::OccupancyGrid local_map = init_map(precast_db.info);
+ 
+  nav_msgs::msg::OccupancyGrid local_map = init_map(precast_db.info);
   // 画像の読み込み
   cv::Mat image = cv::imread(image_path, cv::IMREAD_COLOR);
   if (image.empty()) {
@@ -139,16 +126,9 @@ nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color, cv::V
    // 色の変更処理（例：赤っぽいピクセル → 青に変更）
   for (int y = 0; y < image.rows; ++y) {
     for (int x = 0; x < image.cols; ++x) {
-      std::cout << "Debug: Entering pixel output code" << std::endl;
       cv::Vec3b& pixel = image.at<cv::Vec3b>(y, x);
-      std::cout << "Pixel at (" << x << ", " << y << "): "
-                << "B: " << static_cast<int>(pixel[0]) << ", "
-                << "G: " << static_cast<int>(pixel[1]) << ", "
-                << "R: " << static_cast<int>(pixel[2]) << std::endl
-                << std::flush;
       if (pixel == trimming_color) {  // trimming_colorと一致するピクセルを検出
         pixel = free_color;  // free_colorに変更
-        std::cout << "Pixel at (" << x << ", " << y << ") changed to free_color." << std::endl;
       }
       if (pixel != free_color) {  // free_colorと一致するピクセルを検出
         int x_img = image.cols - 1 - x;  // ← 左右反転
@@ -167,13 +147,4 @@ nav_msgs::OccupancyGrid LocalMapCreator::make_images(cv::Vec3b free_color, cv::V
 
 
   return local_map;
-}
-
-int main(int argc, char *argv[])
-{
-  ros::init(argc, argv, "raycast_mapping");
-  LocalMapCreator local_map_creator;
-  ros::spin();
-
-  return 0;
 }

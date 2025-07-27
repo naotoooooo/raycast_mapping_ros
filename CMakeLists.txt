@@ -1,57 +1,40 @@
 cmake_minimum_required(VERSION 3.8)
 project(raycast_mapping_ros)
 
-add_compile_options(-std=c++17 -O2 -g)
-
-find_package(catkin REQUIRED COMPONENTS
-  nav_msgs
-  pcl_ros
-  roscpp
-  sensor_msgs
-  tf2_eigen
-  tf2_ros
-)
-
-###################################
-## catkin specific configuration ##
-###################################
-catkin_package()
-
-###########
-## Build ##
-###########
-include_directories(include ${catkin_INCLUDE_DIRS})
-
-add_executable(raycast_mapping_node src/raycast_mapping.cpp)
-target_link_libraries(raycast_mapping_node ${catkin_LIBRARIES})
-
-#############
-## Testing ##
-#############
-if(CATKIN_ENABLE_TESTING)
-  find_package(rostest REQUIRED)
-  find_package(roslint REQUIRED)
-  roslint_cpp()
-  roslint_add_test()
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD 17)
 endif()
 
-install(TARGETS raycast_mapping_node DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
 
+find_package(ament_cmake_auto REQUIRED)
+ament_auto_find_build_dependencies()
 
-install(DIRECTORY launch/
-  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}/launch
+ament_auto_add_executable(raycast_mapping_node
+  src/raycast_mapping_node.cpp
+  src/raycast_mapping.cpp
 )
 
+install(DIRECTORY
+  launch
+  DESTINATION share/${PROJECT_NAME}
+)
 
 # OpenCVのビルド環境の設定ファイルを読み込む
 find_package(OpenCV REQUIRED)
 
-# OpenCV関係のインクルードディレクトリのパスを設定
-include_directories(
-    ${OpenCV_INCLUDE_DIRS}
+# 依存関係を追加
+ament_target_dependencies(raycast_mapping_node
+  OpenCV
 )
 
-# リンクするライブラリを読み込む
-target_link_libraries(raycast_mapping_node
-    ${OpenCV_LIBRARIES}
-)
+# コード品質を自動的にチェック
+if(BUILD_TESTING)
+  find_package(ament_lint_auto REQUIRED)
+  set(ament_cmake_copyright_FOUND TRUE)
+  ament_lint_auto_find_test_dependencies()
+endif()
+
+ament_auto_package()
